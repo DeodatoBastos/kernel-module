@@ -10,6 +10,8 @@
  * Copyright John Wiley & Sons - 2018
  */
 
+#include <linux/random.h>
+#include <linux/delay.h>
 #include <linux/uaccess.h>
 #include <asm/param.h>
 #include <linux/init.h>
@@ -32,7 +34,8 @@ static const struct proc_ops proc_fops = {
 };
 
 /* This function is called when the module is loaded. */
-static int proc_init(void) {
+static int proc_init(void)
+{
 
   // creates the /proc/hello entry
   // the following function call is a wrapper for
@@ -45,7 +48,8 @@ static int proc_init(void) {
 }
 
 /* This function is called when the module is removed. */
-static void proc_exit(void) {
+static void proc_exit(void)
+{
 
   // removes the /proc/hello entry
   remove_proc_entry(PROC_NAME, NULL);
@@ -68,27 +72,44 @@ static void proc_exit(void) {
  * count:
  * pos:
  */
-static ssize_t proc_read(struct file *file, char __user *user_buf, size_t count, loff_t *pos) {
+static ssize_t proc_read(struct file *file, char __user *user_buf, size_t count, loff_t *pos)
+{
   int rv = 0;
   char buffer[BUFFER_SIZE];
   static int completed = 0;
+  int i, sleep_value;
+  unsigned long timeout;
 
-  if (completed) {
+  if (completed)
+  {
     completed = 0;
     return 0;
   }
 
   completed = 1;
-  unsigned long t = (unsigned long) jiffies / HZ;
+  unsigned long t = (unsigned long)jiffies / HZ;
 
   rv = sprintf(buffer, "jiffies: %ld\nsecond since first kearnel load: %ld\n", jiffies, t);
 
   // copies the contents of buffer to userspace usr_buf
   int err = copy_to_user(user_buf, buffer, rv);
-  return rv;
   if (err < 0)
-    printk(KERN_ERR"/proc/%s removed\n", PROC_NAME);
+    printk(KERN_ERR "/proc/%s removed\n", PROC_NAME);
 
+  timeout = jiffies + 5 * HZ; // timeout in 5s
+  get_random_bytes(&i, sizeof(i));
+  sleep_value = i % 10000; // sleep between 0 and 10s
+  usleep_range(sleep_value, sleep_value + 1);
+
+  if (time_before(jiffies, timeout))
+    rv = sprintf(buffer, "We didnt timeout. Yayy\n");
+  else
+    rv = sprintf(buffer, "We timed out. Jiffies are awesome\n");
+  err = copy_to_user(user_buf, buffer, rv);
+
+  if (err < 0)
+    printk(KERN_ERR "/proc/%s removed\n", PROC_NAME);
+  return rv;
 }
 
 /* Macros for registering module entry and exit points. */
