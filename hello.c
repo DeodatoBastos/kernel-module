@@ -20,7 +20,7 @@
 #include <linux/proc_fs.h>
 #include <linux/jiffies.h>
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 256
 
 #define PROC_NAME "hello"
 
@@ -77,7 +77,7 @@ static ssize_t proc_read(struct file *file, char __user *user_buf, size_t count,
   int rv = 0;
   char buffer[BUFFER_SIZE];
   static int completed = 0;
-  int i, sleep_value;
+  unsigned i, sleep_value;
   unsigned long timeout;
 
   if (completed)
@@ -89,23 +89,16 @@ static ssize_t proc_read(struct file *file, char __user *user_buf, size_t count,
   completed = 1;
   unsigned long t = (unsigned long)jiffies / HZ;
 
-  rv = sprintf(buffer, "jiffies: %ld\nsecond since first kearnel load: %ld\n", jiffies, t);
-
-  // copies the contents of buffer to userspace usr_buf
-  int err = copy_to_user(user_buf, buffer, rv);
-  if (err < 0)
-    printk(KERN_ERR "/proc/%s removed\n", PROC_NAME);
-
   timeout = jiffies + 5 * HZ; // timeout in 5s
   get_random_bytes(&i, sizeof(i));
-  sleep_value = i % 10000; // sleep between 0 and 10s
+  sleep_value = i % 10000000; // sleep between 0 and 10s
   usleep_range(sleep_value, sleep_value + 1);
 
   if (time_before(jiffies, timeout))
-    rv = sprintf(buffer, "We didnt timeout. Yayy\n");
+    rv = sprintf(buffer, "jiffies: %ld\nsecond since first kearnel load: %ld\nSlept: %d: We didnt timeout. Yayy\n", jiffies, t, sleep_value);
   else
-    rv = sprintf(buffer, "We timed out. Jiffies are awesome\n");
-  err = copy_to_user(user_buf, buffer, rv);
+    rv = sprintf(buffer, "jiffies: %ld\nsecond since first kearnel load: %ld\nSlept: %d: We timed out. Jiffies are awesome\n", jiffies, t, sleep_value);
+  int err = copy_to_user(user_buf, buffer, rv);
 
   if (err < 0)
     printk(KERN_ERR "/proc/%s removed\n", PROC_NAME);
